@@ -1,29 +1,22 @@
 use std::sync::Arc;
-
+mod db;
 use axum::{
     async_trait,
-    http::request::Parts,
     middleware::from_extractor,
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
     Extension, Form, Router,
 };
+use db::User;
 use loginmanager::{AuthContext, AuthUser, CookieSession, CurrentUser, LoginManager};
-use sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, Statement, Value};
+use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, Value};
 use serde::Deserialize;
 
-#[derive(Debug, Clone)]
-struct User {
-    id: i32,
-    name: String,
-    password: String,
-}
-
 #[async_trait]
-impl loginmanager::UserMinix<Parts> for User {
+impl loginmanager::UserMinix<axum::http::request::Parts> for User {
     type Key = i32;
 
-    async fn get_user(id: &Self::Key, req: &mut Parts) -> Option<Self> {
+    async fn get_user(id: &Self::Key, req: &mut axum::http::request::Parts) -> Option<Self> {
         let state = req.extensions.get::<Arc<AppState>>()?;
         let user = state
             .db()
@@ -130,26 +123,11 @@ async fn main() {
         .route("/:path", get(hello_user))
         .route_layer(from_extractor::<AuthUser<User>>());
 
-    let loginmanager = LoginManager::new(CookieSession::new(&[8; 32]))
+    let loginmanager = LoginManager::new(CookieSession::new(&[8; 32]).secure(false))
         .redirect(true)
         .login_view("/login");
 
-    let conn: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
-    conn.execute(Statement::from_string(
-        DatabaseBackend::Sqlite,
-        r#"
-        CREATE TABLE "user" (
-            "id"	INTEGER,
-            "name"	TEXT UNIQUE,
-            "password"	TEXT,
-            PRIMARY KEY("id")
-        );
-        INSERT INTO user VALUES (1,"miku","39"),(2,"miku2","392");
-        "#
-        .to_owned(),
-    ))
-    .await
-    .unwrap();
+    let conn = db::get_db().await;
 
     let app = Router::new()
         .nest("/api", api)
@@ -161,8 +139,8 @@ async fn main() {
         .layer(Extension(Arc::new(AppState { conn })));
 
     // run it with hyper on localhost:3000
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
 }

@@ -7,8 +7,9 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-loginmanager = { path = "../../loginmanager" }
-axum = { version = "0.6.18", features = ["multipart", "headers"] }
+loginmanager = { path = "../../loginmanager", features = ["actix_layer"] }
+actix-web = "4"
+axum = { version = "0.7.4", features = ["multipart"] }
 tokio = { version = "^1", features = ["full", "rt-multi-thread"] }
 futures = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
@@ -28,3 +29,8 @@ sea-orm = { version = "0.11.3", features = [
     "runtime-tokio-native-tls",
     "sqlx-sqlite",
 ] }
+
+
+[[bin]]
+name = "actix"
+path = "src/actix_test.rs"

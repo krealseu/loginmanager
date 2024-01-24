@@ -1,6 +1,6 @@
 [package]
 name = "loginmanager"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "a loginmanager for axum "
 keywords = ["http", "web", "axum", "loginmanager"]
@@ -11,20 +11,22 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures-util = "0.3.28"
-futures = "0.3.28"
+futures-util = "^0.3.28"
+futures = "^0.3.28"
 serde = { version = "^1.0", features = ["derive"] }
 async-trait = "^0.1.68"
 serde_json = "^1.0.96"
-headers = "^0.3.8"
-http = "^0.2.7"
-cookie = { version = "^0.17.0", features = [
+http = "^1"
+hex = "^0.4.2"
+cookie = { version = "^0.18", features = [
     "private",
     "key-expansion",
     "percent-encode",
 ] }
-rust-crypto = "^0.2"
-tower = { version = "^0.4", optional = true }
+sha2 = "^0.10"
+tower-service = { version = "^0.3", optional = true }
+tower-layer = { version = "^0.3.2", optional = true }
+urlencoding = "^2.1.2"
 
 [dependencies.time]
 version = "^0.3"
@@ -32,10 +34,14 @@ features = ["std"]
 default-features = false
 
 [dependencies.axum]
-version = "^0.6"
-features = ["headers"]
+version = "^0.7"
+optional = true
+
+[dependencies.actix-web]
+version = "4"
 optional = true
 
 [features]
-axum_layer = ["axum", "tower"]
+axum_layer = ["axum", "tower-service", "tower-layer"]
+actix_layer = ["actix-web"]
 default = ["axum_layer"]

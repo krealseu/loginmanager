@@ -3,24 +3,26 @@ use std::sync::{Arc, RwLock};
 
 #[allow(unused)]
 #[async_trait]
-pub trait DecodeRequest: Sized + Sync + Send {
-    type Request;
+pub trait DecodeRequest<Req, Res>: Sized + Send {
+    async fn decode(&self, req: &mut Req) -> Result<Option<String>, Res>;
 
-    type Response;
+    async fn update(&self, res: &mut Res);
+}
 
-    async fn decode(&self, req: &Self::Request, login_info: &LoginInfo) -> Option<String>;
+#[allow(unused)]
+#[async_trait(?Send)]
+pub trait DecodeRequest2<Req, Res>: Sized + Send {
+    async fn decode(&self, req: &mut Req) -> Result<Option<String>, Res>;
 
-    async fn update_(&self, res: &mut Self::Response, login_info: &LoginInfo);
+    async fn update(&self, res: &mut Res);
 }
 
 #[derive(Debug, Clone)]
 pub enum State {
     Init,
-    Ok,
     Login(String),
     Update(String),
     Logout,
-    Err,
 }
 
 #[derive(Debug)]
@@ -42,7 +44,6 @@ impl Default for LoginInfoInner {
 
 impl LoginInfoInner {
     pub fn login(&mut self, key_str: String) {
-        // self.key_str = Some(key_str);
         self.state = State::Login(key_str);
     }
 
@@ -90,42 +91,32 @@ impl LoginInfo {
     }
 }
 
-pub struct Inner<D>
-where
-    D: DecodeRequest,
-{
+pub(crate) struct Inner<D> {
     pub(crate) decoder: D,
     pub(crate) login_view: String,
+    pub(crate) next_key: String,
     pub(crate) redirect: bool,
 }
 
-impl<D> Inner<D>
-where
-    D: DecodeRequest,
-{
-    pub fn redirect(&self) -> bool {
-        self.redirect
+impl<D> Inner<D> {
+    /// get next uri
+    pub fn next_to(&self, uri: &str) -> String {
+        let uri = urlencoding::encode_binary(uri.as_bytes()).into_owned();
+        format!("{}?{}={}", self.login_view, self.next_key, uri)
     }
 }
-
-/// LoginManager<D> is implemented as a middleware.   
-/// - `D` the type of DecodeRequest. It decode the key_string from request.  
+/// LoginManager<D> is implemented as a middleware.
+///
+/// - `D` the type of DecodeRequest. It decode the key_string from request.
 #[derive(Clone)]
-pub struct LoginManager<D>(pub(crate) Arc<Inner<D>>)
-where
-    D: DecodeRequest;
+pub struct LoginManager<D>(pub(crate) Arc<Inner<D>>);
 
-impl<D> LoginManager<D>
-where
-    D: DecodeRequest,
-{
-    pub fn new(decoder: D) -> Self
-    where
-        D: DecodeRequest,
-    {
+impl<D> LoginManager<D> {
+    pub fn new(decoder: D) -> Self {
         Self(Arc::new(Inner {
             decoder,
             login_view: "/login".to_owned(),
+            next_key: "next".to_owned(),
             redirect: true,
         }))
     }
@@ -139,6 +130,12 @@ where
     /// Set the login url redirect, default '/login'.
     pub fn login_view<S: Into<String>>(mut self, login_view: S) -> Self {
         Arc::get_mut(&mut self.0).unwrap().login_view = login_view.into();
+        self
+    }
+
+    /// Set the query `?next=/url`, default 'next'.
+    pub fn next_key<S: Into<String>>(mut self, next_key: S) -> Self {
+        Arc::get_mut(&mut self.0).unwrap().next_key = next_key.into();
         self
     }
 }

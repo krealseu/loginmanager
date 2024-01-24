@@ -1,16 +1,23 @@
+#[cfg(feature = "actix_layer")]
+use actix_web::{
+    dev::{ServiceRequest, ServiceResponse},
+    HttpMessage,
+};
 use async_trait::async_trait;
 #[cfg(feature = "axum_layer")]
 use axum::{body::Body, response::Response};
 use cookie::{Cookie, CookieJar, Key, SameSite};
-use http::{header, Request};
+use http::{header, HeaderMap, HeaderValue, Request};
+use sha2::digest::FixedOutput;
+use sha2::{Digest, Sha256};
 
-use headers::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use crypto::{digest::Digest, sha2::Sha256};
-
-use crate::loginmanager::{DecodeRequest, LoginInfo, State};
+use crate::{
+    loginmanager::{DecodeRequest, LoginInfo, State},
+    DecodeRequest2,
+};
 
 /// use cookie as session to storage the info of user key.
 #[derive(Clone)]
@@ -135,39 +142,52 @@ struct Session {
     user_id: Option<String>,
 }
 
-#[cfg(feature = "axum_layer")]
 impl CookieSession {
+    #[cfg(feature = "axum_layer")]
     fn _create_identifier(header: &HeaderMap<HeaderValue>) -> String {
         let mut hasher: Sha256 = Sha256::new();
-        hasher.input_str("loginmanager");
+        hasher.update("loginmanager");
         if let Some(agent) = header.get(header::USER_AGENT) {
             if let Ok(agent) = agent.to_str() {
-                hasher.input_str(agent);
+                hasher.update(agent);
             } else {
-                hasher.input_str("agent-fake");
+                hasher.update("agent-fake");
             };
         };
-        if let Some(agent) = header.get(header::HOST) {
+        if let Some(host) = header.get(header::HOST) {
+            if let Ok(agent) = host.to_str() {
+                hasher.update(agent);
+            } else {
+                hasher.update("host-fake");
+            };
+        };
+        return hex::encode(hasher.finalize_fixed());
+    }
+
+    #[cfg(feature = "actix_layer")]
+    fn _create_identifier_actix(request: &actix_web::HttpRequest) -> String {
+        let mut hasher = Sha256::new();
+        if let Some(addr) = request.connection_info().realip_remote_addr() {
+            if let Some(ip) = addr.split(":").next() {
+                hasher.update(ip);
+            };
+        }
+        if let Some(agent) = request.headers().get(actix_web::http::header::USER_AGENT) {
             if let Ok(agent) = agent.to_str() {
-                hasher.input_str(agent);
-            } else {
-                hasher.input_str("host-fake");
+                hasher.update(agent);
             };
         };
-        return hasher.result_str();
+        return hex::encode(hasher.finalize_fixed());
     }
 }
 
 #[cfg(feature = "axum_layer")]
 #[async_trait]
-impl DecodeRequest for CookieSession {
-    type Request = Request<Body>;
-
-    type Response = Response;
-
-    async fn decode(&self, req: &Self::Request, login_info: &LoginInfo) -> Option<String> {
+impl DecodeRequest<Request<Body>, Response> for CookieSession {
+    async fn decode(&self, req: &mut Request<Body>) -> Result<Option<String>, Response> {
+        let login_info = req.extensions().get::<LoginInfo>().unwrap();
         let session = self.get_session_from(req.headers());
-        session.map_or(None, |s| {
+        Ok(session.map_or(None, |s| {
             let id = Self::_create_identifier(req.headers());
             if s.id == id {
                 login_info.set_ext(Some(id));
@@ -176,10 +196,11 @@ impl DecodeRequest for CookieSession {
                 login_info.set_ext(Some(id));
                 None
             }
-        })
+        }))
     }
 
-    async fn update_(&self, res: &mut Self::Response, login_info: &LoginInfo) {
+    async fn update(&self, res: &mut Response) {
+        let login_info = res.extensions().get::<LoginInfo>().unwrap();
         let key = match login_info.state() {
             State::Login(key) => Some(key),
             State::Update(key) => Some(key),
@@ -199,6 +220,72 @@ impl DecodeRequest for CookieSession {
                 header::SET_COOKIE,
                 HeaderValue::from_str(&i.encoded().to_string()).unwrap(),
             );
+        }
+    }
+}
+
+#[cfg(feature = "actix_layer")]
+#[async_trait(?Send)]
+impl DecodeRequest2<ServiceRequest, ServiceResponse> for CookieSession {
+    async fn decode(&self, req: &mut ServiceRequest) -> Result<Option<String>, ServiceResponse> {
+        let mut cookie_find = "".to_owned();
+        for hdr in req.headers().get_all(actix_web::http::header::COOKIE) {
+            let s = hdr.to_str().unwrap();
+            for cookie_str in s.split(';').map(|s| s.trim()) {
+                if !cookie_str.is_empty() && cookie_str.starts_with(&format!("{}=", self.name)) {
+                    cookie_find = cookie_str.to_string();
+                }
+            }
+        }
+        let session = match Cookie::parse_encoded(cookie_find) {
+            Ok(cookie) => {
+                let mut jar = CookieJar::new();
+                jar.add_original(cookie.clone());
+                if let Some(cookie) = jar.private(&self.key).get(&self.name) {
+                    serde_json::from_str::<Session>(cookie.value()).ok()
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        Ok(session.map_or(None, |s| {
+            let id = Self::_create_identifier_actix(req.request());
+            if s.id == id {
+                s.user_id
+            } else {
+                None
+            }
+        }))
+    }
+
+    async fn update(&self, res: &mut ServiceResponse) {
+        let key = match res
+            .request()
+            .extensions()
+            .get::<LoginInfo>()
+            .unwrap()
+            .state()
+        {
+            State::Login(key) => Some(key),
+            State::Update(key) => Some(key),
+            State::Logout => None,
+            _ => return,
+        };
+
+        let session = Session {
+            id: Self::_create_identifier_actix(res.request()),
+            user_id: key,
+        };
+
+        let jar = self.create_cookie(session);
+
+        for cookie in jar.delta() {
+            let val = actix_web::http::header::HeaderValue::from_str(&cookie.encoded().to_string())
+                .map_err(|_| ())
+                .unwrap();
+            res.headers_mut()
+                .append(actix_web::http::header::SET_COOKIE, val);
         }
     }
 }
