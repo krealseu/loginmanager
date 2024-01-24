@@ -35,9 +35,12 @@ pub struct CookieSession {
 
 impl CookieSession {
     /// The key must be at least 256-bits (32 bytes).  
-    pub fn new(key: &[u8]) -> Self {
+    pub fn new(key: &str) -> Self {
+        let mut hasher: Sha256 = Sha256::new();
+        hasher.update(key);
+        let key = hasher.finalize_fixed();
         Self {
-            key: Key::derive_from(key),
+            key: Key::derive_from(&key),
             name: "_session".to_owned(),
             path: "/".to_owned(),
             domain: None,

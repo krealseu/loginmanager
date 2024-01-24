@@ -116,7 +116,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(conn.clone()))
             .wrap(LoginManager::new(
-                CookieSession::new(&[0; 32]).secure(false),
+                CookieSession::new("secret").secure(false),
             ))
             .service(index)
             .route("/login", web::get().to(login_get))

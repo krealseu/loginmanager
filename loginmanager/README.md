@@ -135,7 +135,7 @@ async fn main() {
         .route("/:path", get(hello_user))
         .route_layer(from_extractor::<AuthUser<User>>());
 
-    let loginmanager = LoginManager::new(CookieSession::new(&[8; 32]).secure(false))
+    let loginmanager = LoginManager::new(CookieSession::new("secret").secure(false))
         .redirect(true)
         .login_view("/login");
 
