@@ -34,7 +34,6 @@ pub struct CookieSession {
 }
 
 impl CookieSession {
-    /// The key must be at least 256-bits (32 bytes).  
     pub fn new(key: &str) -> Self {
         let mut hasher: Sha256 = Sha256::new();
         hasher.update(key);

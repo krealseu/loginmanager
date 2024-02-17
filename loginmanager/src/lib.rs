@@ -1,3 +1,5 @@
+#![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
+
 mod cooke_session;
 mod extractors;
 #[cfg(feature = "actix_layer")]
