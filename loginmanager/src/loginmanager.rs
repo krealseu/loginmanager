@@ -1,20 +1,55 @@
-use async_trait::async_trait;
+use futures::future::{BoxFuture, LocalBoxFuture};
 use std::sync::{Arc, RwLock};
 
 #[allow(unused)]
-#[async_trait]
 pub trait DecodeRequest<Req, Res>: Sized + Send {
-    async fn decode(&self, req: &mut Req) -> Result<Option<String>, Res>;
+    fn decode<'life0, 'life1, 'async_trait>(
+        &'life0 self,
+        req: &'life1 mut Req,
+    ) -> BoxFuture<'async_trait, Result<Option<String>, Res>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async { Ok(None) })
+    }
 
-    async fn update(&self, res: &mut Res);
-}
+    fn update<'life0, 'life1, 'async_trait>(
+        &'life0 self,
+        res: &'life1 mut Res,
+    ) -> BoxFuture<'async_trait, ()>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async {})
+    }
 
-#[allow(unused)]
-#[async_trait(?Send)]
-pub trait DecodeRequest2<Req, Res>: Sized + Send {
-    async fn decode(&self, req: &mut Req) -> Result<Option<String>, Res>;
+    fn decode2<'life0, 'life1, 'async_trait>(
+        &'life0 self,
+        req: &'life1 mut Req,
+    ) -> LocalBoxFuture<'async_trait, Result<Option<String>, Res>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async { Ok(None) })
+    }
 
-    async fn update(&self, res: &mut Res);
+    fn update2<'life0, 'life1, 'async_trait>(
+        &'life0 self,
+        res: &'life1 mut Res,
+    ) -> LocalBoxFuture<'async_trait, ()>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async {})
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -14,10 +14,7 @@ use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use crate::{
-    loginmanager::{DecodeRequest, LoginInfo, State},
-    DecodeRequest2,
-};
+use crate::loginmanager::{DecodeRequest, LoginInfo, State};
 
 /// use cookie as session to storage the info of user key.
 #[derive(Clone)]
@@ -228,8 +225,8 @@ impl DecodeRequest<Request<Body>, Response> for CookieSession {
 
 #[cfg(feature = "actix_layer")]
 #[async_trait(?Send)]
-impl DecodeRequest2<ServiceRequest, ServiceResponse> for CookieSession {
-    async fn decode(&self, req: &mut ServiceRequest) -> Result<Option<String>, ServiceResponse> {
+impl DecodeRequest<ServiceRequest, ServiceResponse> for CookieSession {
+    async fn decode2(&self, req: &mut ServiceRequest) -> Result<Option<String>, ServiceResponse> {
         let mut cookie_find = "".to_owned();
         for hdr in req.headers().get_all(actix_web::http::header::COOKIE) {
             let s = hdr.to_str().unwrap();
@@ -261,7 +258,7 @@ impl DecodeRequest2<ServiceRequest, ServiceResponse> for CookieSession {
         }))
     }
 
-    async fn update(&self, res: &mut ServiceResponse) {
+    async fn update2(&self, res: &mut ServiceResponse) {
         let key = match res
             .request()
             .extensions()

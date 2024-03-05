@@ -172,3 +172,6 @@ async fn main() {
         .unwrap();
 }
 ```
+
+# Usage for Actix
+Enable features `actix_layer`, [Example](https://github.com/krealseu/loginmanager/blob/main/examples/axum_loginmanager/src/actix_test.rs).

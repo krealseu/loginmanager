@@ -3,15 +3,48 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::loginmanager::LoginInfo;
 
+
+/// ## Example
+/// ``` no_run
+/// #[async_trait]
+/// impl loginmanager::UserMinix<axum::http::request::Parts> for User {
+///     type Key = i32;
+///
+///     async fn get_user(id: &Self::Key, req: &mut axum::http::request::Parts) -> Option<Self> {
+///         let user = todo!();
+///         Some(user)
+///     }
+///
+///     fn get_id(&self) -> &Self::Key {
+///         &self.id
+///     }
+/// }
+///
+/// use actix_web::HttpRequest;
+/// #[async_trait(?Send)]
+/// impl loginmanager::UserMinix<HttpRequest> for User {
+///     type Key = i32;
+///
+///     async fn get_user2(id: &Self::Key, req: &mut HttpRequest) -> Option<Self>{
+///         let user = todo!();
+///         Some(user)
+///     }
+///
+///     fn get_id(&self) -> &Self::Key {
+///         &self.id
+///     }
+/// }
+/// ```
 #[allow(unused)]
 pub trait UserMinix<R>: Sized + Sync + Send + Clone {
     /// The type of User, must be same as Loginmanager.
     /// Otherwise no user will be returned.
     type Key: Serialize + DeserializeOwned + Send + Sync;
 
-    /// Get user from id and req,Tip:can use req.app_data to obtain
+    /// Get user from id and req.
+    ///
+    /// **Tip**:can use req.app_data to obtain
     /// database connection defined in Web app.
-    // async fn get_user(id: &Self::Key, req: &mut R) -> Option<Self>;
     fn get_user<'l1, 'l2, 'a>(id: &'l1 Self::Key, req: &'l2 mut R) -> BoxFuture<'a, Option<Self>>
     where
         'l1: 'a,
@@ -47,9 +80,32 @@ pub trait UserMinix<R>: Sized + Sync + Send + Clone {
     }
 }
 
+
+/// `CurrentUser<T>`
+///
+/// The request will be rejected if the user is not logged in.
+///
+/// `CurrentUser<Option<T>>`
+///
+/// The request will not be not rejected if the user is not logged in.
 #[derive(Debug, Clone)]
 pub struct CurrentUser<T>(pub T);
 
+impl<T> From<T> for CurrentUser<T> {
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+/// `AuthUser<T>` Extractor
+///
+/// The request will be rejected if:
+/// - The user is not logged in
+/// - The logged-in user is not authenticated or inactive
+///
+/// `AuthUser<Option<T>>` Extractor
+///
+/// The request will not be not rejected if the user is not logged in.
 #[derive(Debug, Clone)]
 pub struct AuthUser<T>(pub T);
 

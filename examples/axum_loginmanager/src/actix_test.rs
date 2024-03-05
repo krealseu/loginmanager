@@ -1,10 +1,4 @@
-use std::rc::Rc;
-
-use actix_web::{
-    get,
-    web::{self, Redirect},
-    App, HttpRequest, HttpResponse, HttpServer, Responder,
-};
+use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use axum::async_trait;
 use db::User;
 use loginmanager::{AuthContext, AuthUser, CookieSession, CurrentUser, LoginManager};

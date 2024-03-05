@@ -13,7 +13,7 @@ use actix_web::{
 };
 use futures_util::future::LocalBoxFuture;
 
-use crate::{loginmanager::Inner, DecodeRequest2, LoginInfo, LoginManager};
+use crate::{loginmanager::Inner, DecodeRequest, LoginInfo, LoginManager};
 
 // Middleware factory is `Transform` trait
 // `S` - type of the next service
@@ -23,7 +23,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
-    D: DecodeRequest2<ServiceRequest, ServiceResponse<B>> + 'static,
+    D: DecodeRequest<ServiceRequest, ServiceResponse<B>> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
@@ -56,7 +56,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    D: DecodeRequest2<ServiceRequest, ServiceResponse<B>> + 'static,
+    D: DecodeRequest<ServiceRequest, ServiceResponse<B>> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
@@ -72,12 +72,12 @@ where
         req.extensions_mut().insert(logininfo.clone());
 
         Box::pin(async move {
-            match loginmanager.decoder.decode(&mut req).await {
+            match loginmanager.decoder.decode2(&mut req).await {
                 Ok(key) => logininfo.set_key_str(key),
                 Err(res) => return Ok(res),
             };
             let mut res = serv.call(req).await?;
-            loginmanager.decoder.update(&mut res).await;
+            loginmanager.decoder.update2(&mut res).await;
 
             if loginmanager.redirect && res.status().as_u16() == 401 {
                 res.response_mut().head_mut().status = StatusCode::FOUND;
