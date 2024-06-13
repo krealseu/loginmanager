@@ -53,6 +53,11 @@ impl CookieSession {
         self
     }
 
+    pub fn path(mut self, path: String) -> Self {
+        self.path = path;
+        self
+    }
+
     pub fn secure(mut self, secure: bool) -> Self {
         self.secure = secure;
         self
@@ -186,16 +191,10 @@ impl DecodeRequest<Request<Body>, Response> for CookieSession {
     async fn decode(&self, req: &mut Request<Body>) -> Result<Option<String>, Response> {
         let login_info = req.extensions().get::<LoginInfo>().unwrap();
         let session = self.get_session_from(req.headers());
-        Ok(session.map_or(None, |s| {
-            let id = Self::_create_identifier(req.headers());
-            if s.id == id {
-                login_info.set_ext(Some(id));
-                s.user_id
-            } else {
-                login_info.set_ext(Some(id));
-                None
-            }
-        }))
+        let id = Self::_create_identifier(req.headers());
+        let res = Ok(session.map_or(None, |s| if s.id == id { s.user_id } else { None }));
+        login_info.set_ext(Some(id));
+        res
     }
 
     async fn update(&self, res: &mut Response) {

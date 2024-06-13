@@ -1,6 +1,6 @@
 [package]
 name = "loginmanager"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "a loginmanager for axum "
 keywords = ["http", "web", "axum", "loginmanager"]
