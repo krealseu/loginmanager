@@ -11,8 +11,8 @@ mod loginmanager;
 mod loginmanager_actix;
 #[cfg(feature = "axum_layer")]
 mod loginmanager_axum;
-mod loginrequired;
+// mod loginrequired;
 pub use cooke_session::CookieSession;
 pub use extractors::{AuthContext, AuthUser, CurrentUser, UserMinix};
 pub use loginmanager::{DecodeRequest, LoginInfo, LoginManager};
-pub use loginrequired::LoginRequired;
+// pub use loginrequired::LoginRequired;

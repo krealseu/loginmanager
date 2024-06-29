@@ -19,7 +19,7 @@ where
             return Ok(Self(Some(u.to_owned())));
         }
         if let Some(info) = parts.extensions.get::<LoginInfo>() {
-            if let Some(key) = info.key_str() {
+            if let Some(key) = info.get_key() {
                 if let Ok(key) = serde_json::from_str::<T::Key>(&key) {
                     let real_user = T::get_user(&key, parts).await;
                     if let Some(real_user) = real_user {

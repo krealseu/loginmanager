@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 
 #[allow(unused)]
 pub trait DecodeRequest<Req, Res>: Sized + Send {
+    /// get user key
     fn decode<'life0, 'life1, 'async_trait>(
         &'life0 self,
         req: &'life1 mut Req,
@@ -52,18 +53,11 @@ pub trait DecodeRequest<Req, Res>: Sized + Send {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum State {
-    Init,
-    Login(String),
-    Update(String),
-    Logout,
-}
-
 #[derive(Debug)]
 struct LoginInfoInner {
     pub key_str: Option<String>,
-    pub state: State,
+    pub logout: bool,
+    pub new_key: Option<String>,
     pub ext: Option<String>,
 }
 
@@ -71,7 +65,8 @@ impl Default for LoginInfoInner {
     fn default() -> Self {
         Self {
             key_str: None,
-            state: State::Init,
+            logout: false,
+            new_key: None,
             ext: None,
         }
     }
@@ -79,12 +74,12 @@ impl Default for LoginInfoInner {
 
 impl LoginInfoInner {
     pub fn login(&mut self, key_str: String) {
-        self.state = State::Login(key_str);
+        self.new_key = Some(key_str)
     }
 
     pub fn logout(&mut self) {
         self.key_str = None;
-        self.state = State::Logout;
+        self.logout = true;
     }
 }
 
@@ -101,20 +96,26 @@ impl LoginInfo {
         self.0.write().unwrap().logout();
     }
 
-    pub(crate) fn key_str(&self) -> Option<String> {
+    pub(crate) fn get_key(&self) -> Option<String> {
         self.0.read().unwrap().key_str.clone()
     }
 
-    pub(crate) fn set_key_str(&self, key_str: Option<String>) {
+    pub(crate) fn set_key(&self, key_str: Option<String>) {
         self.0.write().unwrap().key_str = key_str;
     }
 
-    pub fn state(&self) -> State {
-        self.0.read().unwrap().state.clone()
+    pub fn login_key(&self) -> Option<String> {
+        self.0.read().unwrap().new_key.clone()
     }
 
-    pub fn set_state(&self, state: State) {
-        self.0.write().unwrap().state = state;
+    /// new user login
+    pub fn is_login(&self) -> bool {
+        self.0.read().unwrap().new_key.is_some()
+    }
+
+    /// user had logout
+    pub fn is_logout(&self) -> bool {
+        self.0.read().unwrap().logout
     }
 
     pub fn ext(&self) -> Option<String> {

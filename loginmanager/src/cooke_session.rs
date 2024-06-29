@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use crate::loginmanager::{DecodeRequest, LoginInfo, State};
+use crate::loginmanager::{DecodeRequest, LoginInfo};
 
 /// use cookie as session to storage the info of user key.
 #[derive(Clone)]
@@ -48,6 +48,7 @@ impl CookieSession {
         }
     }
 
+    /// Set cookie name, Default: `_session`
     pub fn name(mut self, name: &'static str) -> Self {
         self.name = name.to_owned();
         self
@@ -58,11 +59,13 @@ impl CookieSession {
         self
     }
 
+    /// Cookie requires Secure or not, Default `true`
     pub fn secure(mut self, secure: bool) -> Self {
         self.secure = secure;
         self
     }
 
+    /// Cookie uses HttpOnly or not, Default `true`
     pub fn http_only(mut self, http_only: bool) -> Self {
         self.http_only = http_only;
         self
@@ -73,16 +76,13 @@ impl CookieSession {
         self
     }
 
-    pub fn max_age(mut self, max_age: Option<Duration>) -> Self {
+    /// Cookie expires, Default: 30 days
+    pub fn duration(mut self, max_age: Option<Duration>) -> Self {
         self.max_age = max_age;
         self
     }
 
-    pub fn expires_in(mut self, expires_in: Option<Duration>) -> Self {
-        self.expires_in = expires_in;
-        self
-    }
-
+    /// Cookie requires same origin, Default `None`
     pub fn same_site(mut self, same_site: Option<SameSite>) -> Self {
         self.same_site = same_site;
         self
@@ -199,11 +199,12 @@ impl DecodeRequest<Request<Body>, Response> for CookieSession {
 
     async fn update(&self, res: &mut Response) {
         let login_info = res.extensions().get::<LoginInfo>().unwrap();
-        let key = match login_info.state() {
-            State::Login(key) => Some(key),
-            State::Update(key) => Some(key),
-            State::Logout => None,
-            _ => return,
+        let key = if login_info.is_logout() {
+            None
+        } else if login_info.is_login() {
+            login_info.login_key()
+        } else {
+            return;
         };
 
         let id = login_info
@@ -258,19 +259,19 @@ impl DecodeRequest<ServiceRequest, ServiceResponse> for CookieSession {
     }
 
     async fn update2(&self, res: &mut ServiceResponse) {
-        let key = match res
+        let logininfo = res
             .request()
             .extensions()
             .get::<LoginInfo>()
             .unwrap()
-            .state()
-        {
-            State::Login(key) => Some(key),
-            State::Update(key) => Some(key),
-            State::Logout => None,
-            _ => return,
+            .clone();
+        let key = if logininfo.is_logout() {
+            None
+        } else if logininfo.is_login() {
+            logininfo.login_key()
+        } else {
+            return;
         };
-
         let session = Session {
             id: Self::_create_identifier_actix(res.request()),
             user_id: key,

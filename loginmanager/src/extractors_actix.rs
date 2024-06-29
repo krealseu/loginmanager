@@ -19,7 +19,7 @@ where
                 return Ok(Self(Some(u.to_owned())));
             }
             if let Some(info) = extensions.get::<LoginInfo>() {
-                if let Some(key) = info.key_str() {
+                if let Some(key) = info.get_key() {
                     if let Ok(key) = serde_json::from_str::<T::Key>(&key) {
                         let real_user = T::get_user2(&key, &mut req_clone2).await;
                         if let Some(u) = real_user {

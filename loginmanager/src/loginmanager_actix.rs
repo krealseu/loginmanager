@@ -73,7 +73,7 @@ where
 
         Box::pin(async move {
             match loginmanager.decoder.decode2(&mut req).await {
-                Ok(key) => logininfo.set_key_str(key),
+                Ok(key) => logininfo.set_key(key),
                 Err(res) => return Ok(res),
             };
             let mut res = serv.call(req).await?;
